@@ -15,6 +15,16 @@ const itemSchema = new mongoose.Schema({
             required: true
         },
     },
+    report: {
+        data: {
+            type: Buffer,
+            required: true
+        },
+        ContentType: {
+            type: String,
+            required: true
+        },
+    },
     description: {
         type: String,
         required: true

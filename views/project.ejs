@@ -41,6 +41,10 @@
                             <% if(item.link != null){ %>
                                 <a href="<%= item.link %>" class="btn btn-outline-secondary fw-bold" target="_blank"> Git Hub </a>
                             <%}%>
+
+                            <% if(item.report != null){ %>
+                                <a href="reports/<%= item.report.data %>" class="btn btn-outline-secondary fw-bold" target="_blank"> Report </a>
+                            <%}%>
                             
                             <div class="btn-group">
                                 <a href="javascript:window.history.back()"

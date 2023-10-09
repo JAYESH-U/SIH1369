@@ -7,7 +7,7 @@
     </button>
 </form> -->
 <div class="container mt-5 pt-4">
-    <form class="needs-validation" action="/additem" method="post" enctype="multipart/form-data" novalidate>
+    <form class="needs-validation" id="myForm" action="/additem" method="post" enctype="multipart/form-data" novalidate>
         
         <div class="input-group mb-3">
             <span class="input-group-text" id="basic-addon1">Name</span>
@@ -44,6 +44,12 @@
             <input type="file" id="myFile" name="imgfile" class="form-control" placeholder="Project name" aria-label="Username" aria-describedby="basic-addon1" required>
             <div class="invalid-feedback">Choose image.</div>
         </div>
+
+        <div class="input-group mb-3">
+            <span class="input-group-text" id="basic-addon1">Report</span>
+            <input type="file" id="myPdfFile" name="pdffile" class="form-control" placeholder="Project name" aria-label="Username" aria-describedby="basic-addon1" required>
+            <div class="invalid-feedback">Choose file.</div>
+        </div>
         
         <div class="input-group mb-3">
             <span class="input-group-text" id="basic-addon1">Video link</span>
@@ -60,8 +66,35 @@
     </div>
 
     <br>
-    <p><%= message %></p>
+    <!-- <p><%= message %></p> -->
 </div>
+
+<% if(message){ %>
+    <script>
+        // Use JavaScript to trigger the modal display
+        document.addEventListener("DOMContentLoaded", function () {
+            var modal = new bootstrap.Modal(document.querySelector(".modal"));
+            modal.show();
+        });
+    </script>
+    <div class="modal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Message</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p><%= message %></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <!-- <button type="button" class="btn btn-primary">Save changes</button> -->
+                </div>
+            </div>
+        </div>
+    </div>
+<% } %>
 
 <script>
     (function () {

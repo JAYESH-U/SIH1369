@@ -8,6 +8,8 @@ var MongoDBSession = require('connect-mongodb-session')(session);
 const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
+const axios = require('axios');
+
 
 const app = express();
 
@@ -32,6 +34,9 @@ const defaultOrders = require("./defaultItemsInDB/orders");
 const items = require("./defaultItemsInDB/items");
 const collab = require("./models/collab");
 
+
+const { checkPlagiarism } = require('./plagiarismChecker.js'); // Adjust the path as needed
+
 // const MongoURI = 'mongodb://127.0.0.1:27017/techsolution';
 const MongoURI = process.env.MONGO_URI;
 
@@ -48,30 +53,35 @@ mongoose
         console.error('Error connecting to MongoDB:', error);
     });
 
-//set storage for images
-const dir = "./public/img";
+//set storage for images and report files
+const imgDir = "./public/img";
+const reportDir = "./public/report";
 
 const upload = multer({
     storage: multer.diskStorage({
         destination: (req, file, cb) => {
-            if (!fs.existsSync(dir)) {
-                fs.mkdirSync(dir);
+            // Determine the destination directory based on the field name
+            if (file.fieldname === 'imgfile') {
+                cb(null, imgDir);
+            } else if (file.fieldname === 'pdffile') {
+                cb(null, reportDir);
+            } else {
+                cb(new Error("Invalid field name"), null);
             }
-            cb(null, dir); // Use the defined directory
         },
         filename: (req, file, cb) => {
-            cb(null, file.originalname)
+            cb(null, file.originalname);
         },
     }),
 
     fileFilter: (req, file, cb) => {
         let ext = path.extname(file.originalname);
-        if (ext !== '.png' && ext !== '.jpg' && ext !== '.gif' && ext !== '.jpeg') {
+        if (ext !== '.png' && ext !== '.jpg' && ext !== '.gif' && ext !== '.jpeg' && ext !== '.pdf') {
             return cb(null, false);
         }
         cb(null, true);
     }
-}).single('imgfile');
+}).fields([{ name: 'imgfile', maxCount: 1 }, { name: 'pdffile', maxCountL: 1 }]);
 
 const store = new MongoDBSession({
     uri: MongoURI,
@@ -97,7 +107,6 @@ const isAuth = (req, res, next) => {
         res.redirect("/");
     }
 }
-
 
 app.use((err, req, res, next) => {
     console.error(err.stack);
@@ -264,7 +273,7 @@ app.get("/admin", isAuth, function (req, res) {
 
     // console.log(req.session.user);
 
-    Item.find({ college: req.session.user.name})
+    Item.find({ college: req.session.user.name })
         .then(function (itemList) {
             Order.find({})
                 .then((orderList) => {
@@ -280,37 +289,44 @@ app.get("/admin", isAuth, function (req, res) {
 });
 
 app.get("/additem", isAuth, function (req, res) {
-    res.render("additem", { message: "Add new item details." });
+    res.render("additem", { message: "" });
 });
 
 function addCollab(item, usn) {
-    User.findOne({ usn: usn })
-        .then((foundUser) => {
-            if (!foundUser) {
-                console.log("No user found for collab");
-            } else {
-                Item.findOne({ name: item.name })
-                    .then((foundItem) => {
-                        const collab = new Collab({
-                            student_id: foundUser._id,
-                            item_id: foundItem._id
-                        });
-                        collab.save()
-                            .then(() => {
-                                console.log("Collab with item saved successfully");
-                            })
-                            .catch((err) => {
-                                console.log("Error creating a collab with item", err);
+    return new Promise((resolve, reject) => {
+        User.findOne({ usn: usn })
+            .then((foundUser) => {
+                if (!foundUser) {
+                    console.log("No user found for collab");
+                    reject(new Error("No user found for collab"));
+                } else {
+                    Item.findOne({ name: item.name })
+                        .then((foundItem) => {
+                            const collab = new Collab({
+                                student_id: foundUser._id,
+                                item_id: foundItem._id
                             });
-                    })
-                    .catch((err) => {
-                        console.log("Error finding item details for collab ", err);
-                    });
-            }
-        })
-        .catch((err) => {
-            console.log("Error finding user for collab, ", err);
-        })
+                            collab.save()
+                                .then(() => {
+                                    console.log("Collab with item saved successfully");
+                                    resolve(); // Resolve the promise when collab is saved
+                                })
+                                .catch((err) => {
+                                    console.log("Error creating a collab with item", err);
+                                    reject(err); // Reject the promise if there's an error
+                                });
+                        })
+                        .catch((err) => {
+                            console.log("Error finding item details for collab ", err);
+                            reject(err); // Reject the promise if there's an error
+                        });
+                }
+            })
+            .catch((err) => {
+                console.log("Error finding user for collab, ", err);
+                reject(err); // Reject the promise if there's an error
+            });
+    });
 }
 
 app.post("/additem", upload, function (req, res) {
@@ -321,7 +337,8 @@ app.post("/additem", upload, function (req, res) {
     const subject = req.body.subject;
     const studentUSN = req.body.student;
     const college = req.body.college;
-    const imgFile = req.file;
+    const imgFile = req.files.imgfile;
+    const pdfFile = req.files.pdffile;
     let link = req.body.link;
 
     if (link.length == 0) {
@@ -329,19 +346,33 @@ app.post("/additem", upload, function (req, res) {
     }
 
     // Check if a file was uploaded
-    if (!imgFile) {
+    if (!imgFile || imgFile[0].mimetype == 'application/pdf') {
         console.log("No image file was uploaded.");
-        res.redirect("/admin");
+        res.render("additem", { message: "Upload file with mentioned format (jpg, jpeg, png only)." });
         return;
     }
+
+    if (!pdfFile || pdfFile[0].mimetype != 'application/pdf') {
+        console.log("No PDF file was uploaded.");
+        res.render("additem", { message: "Upload file with mentioned format (pdf only)." });
+        return;
+    }
+
+    // console.log(req.files);
+    // console.log(imgFile[0].originalname);
+    // console.log(pdfFile[0].originalname);
 
     Admin.findOne({ name: college })
         .then((foundCollege) => {
             const item = new Item({
                 name: name,
                 image: {
-                    data: imgFile.filename,
-                    ContentType: imgFile.mimetype
+                    data: imgFile[0].originalname,
+                    ContentType: imgFile[0].mimetype
+                },
+                report: {
+                    data: pdfFile[0].originalname,
+                    ContentType: pdfFile[0].mimetype
                 },
                 description: description,
                 college: college,
@@ -357,22 +388,24 @@ app.post("/additem", upload, function (req, res) {
                 .then(function (foundItem) {
                     if (!foundItem) {
                         console.log("Similar item not found.");
-                        console.log(item);
+                        // console.log(item);
                         item.save()
-                            .then(() => {
-                                console.log("Item saved Successfully : " + item);
-                                res.redirect("/admin");
+                            .then((savedItem) => {
+                                console.log("Item saved Successfully : \n" + savedItem);
+                                //add collab after saving item successfully.
+                                addCollab(item, studentUSN)
+                                    .then(() => {
+                                        console.log("Collaboration complete.");
+                                        //plagarism check
+                                        res.redirect('/uploadReport/' + savedItem._id)
+                                    })
+                                    .catch((err) => {
+                                        console.log("Error creating collaboration, ", err);
+                                    });
+                                // res.redirect("/admin");
                             })
                             .catch((error) => {
                                 console.log("Error saving Item : " + error);
-                            });
-
-                        addCollab(item, studentUSN)
-                            .then(() => {
-                                console.log("Collaboration complete.");
-                            })
-                            .catch((err) => {
-                                console.log("Error creating collaboration, ", err);
                             });
                     } else {
                         console.log("Similar item has been found and you will be redirected to additem page.");
@@ -389,29 +422,109 @@ app.post("/additem", upload, function (req, res) {
 
 });
 
+app.get('/uploadReport/:itemid', async function (req, res) {
+    const itemId = req.params.itemid;
+    let foundItem = null;
+
+    try {
+        foundItem = await Item.findById(itemId);
+        console.log('Item found : ', foundItem);
+    } catch (err) {
+        console.log('item Not found while checking plagiarism.', err);
+        return;
+    }
+    console.log('In upload report function route.');
+    console.log(foundItem);
+    const filePath = './public/report/' + foundItem.report.data;
+    console.log(filePath);
+
+    try {
+        let percentPlagiarism = await checkPlagiarism(filePath);
+        console.log('Percentage plagiarism:', percentPlagiarism);
+        let message = '';
+        let problemFlag = false;
+
+        percentPlagiarism = 50;
+
+        if (!percentPlagiarism) {
+            message = "Something went wrong";
+            problemFlag = true;
+        } else if (percentPlagiarism <= 40) {
+            message = "You are good to go.";
+        } else {
+            console.log('Percentage plagiarism:', percentPlagiarism);
+            message = "Sorry, You cannot proceed further.";
+            problemFlag = true;
+        }
+        console.log('message: ', message);
+
+        if (problemFlag) {
+            try {
+                deleteItemAndCollabs(itemId)
+                    .then((deletedItems) => {
+                        console.log("deleted Items after plagarism : \n", deletedItems);
+                    })
+                    .catch((err) => {
+                        console.error("Error deleting item and collabs:", err);
+                    });
+
+                console.log('Project deleted successfully.');
+            } catch (error) {
+                console.error('Error deleting project:', error);
+            }
+        }
+        res.render('ans', { percentPlagiarism, message });
+    } catch (error) {
+        console.error('Error in app.js:', error);
+    }
+});
+
+app.get('/ans', (req, res) => {
+    res.render('ans', { percentPlagiarism: null, message: 'You cannot upload this project.' });
+});
+
+function deleteItemAndCollabs(item_id) {
+    return new Promise((resolve, reject) => {
+        Item.findOneAndRemove({ _id: item_id })
+            .then((item) => {
+                if (!item) {
+                    return reject(new Error("Item not found"));
+                }
+
+                fs.unlinkSync(`./public/img/${item.image.data}`);
+                fs.unlinkSync(`./public/report/${item.report.data}`);
+                console.log("Successfully deleted the Item.");
+
+                Collab.deleteMany({ item_id })
+                    .then((collabs) => {
+                        console.log(collabs);
+                        console.log("Successfully deleted collabs after deleting items.");
+                        resolve(collabs);
+                    })
+                    .catch((err) => {
+                        console.log('Error deleting collab items after deleting items.', err);
+                        reject(err);
+                    });
+            })
+            .catch((err) => {
+                console.log("Error deleting Item : " + err);
+                reject(err);
+            });
+    });
+}
+
+
 app.post("/admin/projects/delete", function (req, res) {
     const item_id = req.body.item_id;
 
     console.log("Deleting : " + item_id);
 
-    Item.findOneAndRemove({ _id: item_id })
-        .then((item) => {
-            fs.unlinkSync(`./public/img/${item.image.data}`);
-            console.log("Successfully deleted the Item.");
-
-            Collab.deleteMany({ item_id })
-                .then((collabs) => {
-                    for(let collab of collabs){
-                        console.log('Deleted : ', collab._id);
-                    }
-                    console.log("Successfully deleted collabs after deleting items.");
-                })
-                .catch((err) => {
-                    console.log('Error deleting collab items after deleting items.');
-                });
+    deleteItemAndCollabs(item_id)
+        .then(() => {
+            console.log("successfully deleted item and collabs");
         })
         .catch((err) => {
-            console.log("Error deleting Item : " + err);
+            console.error("Error deleting item and collabs:", err);
         });
 
     res.redirect('/admin');
@@ -480,6 +593,14 @@ app.get("/projects/:projectid", async function (req, res) {
         console.log("Error finding project by ID: " + err);
         res.status(500).send("Internal Server Error");
     }
+});
+
+app.get('/projects/reports/:reportname', function (req, res) {
+    const reportName = req.params.reportname;
+    const filePath = path.join(__dirname, 'public', 'report', reportName);
+
+    // Use res.sendFile to send the PDF file as a response
+    res.sendFile(filePath);
 });
 
 app.get("/admin/projects/:projectid", async function (req, res) {
@@ -580,7 +701,7 @@ app.post("/editproject", upload, function (req, res) {
     const college = req.body.college;
     let link = req.body.link;
 
-    const imgFile = req.file;
+    const imgFile = req.files.imgfile;
 
     if (!imgFile) {
         console.log("No image file was uploaded.");
@@ -599,8 +720,8 @@ app.post("/editproject", upload, function (req, res) {
             });
 
         const image = {
-            data: imgFile.filename,
-            ContentType: imgFile.mimetype
+            data: imgFile[0].originalname,
+            ContentType: imgFile[0].mimetype
         }
 
         console.log(image.data, image.ContentType);

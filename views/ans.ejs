@@ -1,0 +1,17 @@
+<%- include("partials/header") -%>
+    <%- include("navbar") -%>
+
+    <div class="container d-flex justify-content-center align-items-center flex-column">
+        <h1>
+            <%= message %>
+        </h1>
+        <h2>
+            Plagiarism percent: <%= percentPlagiarism %>%
+        </h2>
+    </div>
+
+    <div class="container d-flex justify-content-center">
+        <a href="/admin" class="btn bg-secondary px-5 my-5">Ok</a>
+    </div>
+
+<%- include("partials/footer") -%>
