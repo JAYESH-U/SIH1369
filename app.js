@@ -446,14 +446,14 @@ app.get('/uploadReport/:itemid', async function (req, res) {
 
         percentPlagiarism = 50;
 
-        if (!percentPlagiarism) {
+        if (percentPlagiarism === null) {
             message = "Something went wrong";
             problemFlag = true;
-        } else if (percentPlagiarism <= 40) {
+        } else if (percentPlagiarism <= 30) {
             message = "You are good to go.";
         } else {
             console.log('Percentage plagiarism:', percentPlagiarism);
-            message = "Sorry, You cannot proceed further.";
+            message = "Sorry, You cannot proceed further.Plagarism must be less than 30%";
             problemFlag = true;
         }
         console.log('message: ', message);
