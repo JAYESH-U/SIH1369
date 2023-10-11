@@ -292,7 +292,7 @@ app.get("/additem", isAuth, function (req, res) {
     res.render("additem", { message: "" });
 });
 
-function addCollab(item, usn) {
+function addCollab(item, usn, role) {
     return new Promise((resolve, reject) => {
         User.findOne({ usn: usn })
             .then((foundUser) => {
@@ -304,7 +304,8 @@ function addCollab(item, usn) {
                         .then((foundItem) => {
                             const collab = new Collab({
                                 student_id: foundUser._id,
-                                item_id: foundItem._id
+                                item_id: foundItem._id,
+                                role: role
                             });
                             collab.save()
                                 .then(() => {
@@ -393,11 +394,11 @@ app.post("/additem", upload, function (req, res) {
                             .then((savedItem) => {
                                 console.log("Item saved Successfully : \n" + savedItem);
                                 //add collab after saving item successfully.
-                                addCollab(item, studentUSN)
+                                addCollab(item, studentUSN, 'leader')
                                     .then(() => {
                                         console.log("Collaboration complete.");
                                         //plagarism check
-                                        res.redirect('/uploadReport/' + savedItem._id)
+                                        res.redirect('/uploadreport/' + savedItem._id);
                                     })
                                     .catch((err) => {
                                         console.log("Error creating collaboration, ", err);
@@ -409,7 +410,8 @@ app.post("/additem", upload, function (req, res) {
                             });
                     } else {
                         console.log("Similar item has been found and you will be redirected to additem page.");
-                        res.render("additem", { message: "Similar item has been found and you will be redirected to additem page." })
+                        // res.render("additem", { message: "Similar item has been found and you will be redirected to additem page." });
+                        res.redirect('/uploaderror/' + foundItem.name);
                     }
                 })
                 .catch((err) => {
@@ -422,7 +424,7 @@ app.post("/additem", upload, function (req, res) {
 
 });
 
-app.get('/uploadReport/:itemid', async function (req, res) {
+app.get('/uploadreport/:itemid', async function (req, res) {
     const itemId = req.params.itemid;
     let foundItem = null;
 
@@ -444,7 +446,7 @@ app.get('/uploadReport/:itemid', async function (req, res) {
         let message = '';
         let problemFlag = false;
 
-        percentPlagiarism = 50;
+        percentPlagiarism = 20;
 
         if (percentPlagiarism === null) {
             message = "Something went wrong";
@@ -476,6 +478,23 @@ app.get('/uploadReport/:itemid', async function (req, res) {
         res.render('ans', { percentPlagiarism, message });
     } catch (error) {
         console.error('Error in app.js:', error);
+    }
+});
+
+app.get('/uploaderror/:itemname', async function (req, res) {
+    const itemName = req.params.itemname;
+    console.log(itemName);
+
+    let itemList = [];
+    try {
+        itemList = await Item.find({ name: itemName });
+        res.render('uploadError', {
+            itemList,
+            message: 'Similar projects available.'
+        });
+    } catch (err) {
+        console.log("Error finding similar items using names for collab.");
+        res.render('/additem', { message: "Sorry, Error uploading project." });
     }
 });
 
@@ -655,40 +674,63 @@ app.get("/admin/projects/:projectid", async function (req, res) {
     }
 });
 
-app.post("/addcollaborator", function (req, res) {
-    const itemID = req.body.item_id;
+app.post("/addcollaborator", async function (req, res) {
+    const itemId = req.body.item_id;
     const collabusn = req.body.collabusn;
+    const role = 'member';
 
-    Item.findOne({ _id: itemID })
-        .then((foundItem) => {
-            if (!foundItem) {
-                console.log("Item not found for addcollab.");
-            } else {
-                console.log("item found for addcollab.");
-                console.log(foundItem, collabusn);
-                addCollab(foundItem, collabusn);
-            }
-        })
-        .catch((err) => {
-            console.log("Error finding item for addCollab. ", err);
-        });
+    try {
+        const foundItem = await Item.findOne({ _id: itemId });
+        if (!foundItem) {
+            console.log("Item not found for addcollab.");
+        } else {
+            console.log("item found for addcollab.");
+            console.log(foundItem, collabusn);
+            addCollab(foundItem, collabusn, role);
+        }
+    } catch (err) {
+        console.log("Error finding item to add collab.", err);
+    }
 
-    res.redirect('/admin/projects/' + itemID);
+    res.redirect('/admin/projects/' + itemId);
 });
 
-app.post('/deletecollaborator', function (req, res) {
+app.post('/deletecollaborator', async function (req, res) {
     const collabID = req.body.collab_id;
     const itemID = req.body.item_id;
 
     console.log(collabID, itemID);
 
-    Collab.deleteOne({ student_id: collabID, item_id: itemID })
-        .then(() => {
-            console.log("Collaboration Deleted.");
-        })
-        .catch((err) => {
-            console.log("Error deleting collaboration.", err);
-        });
+    try {
+        const foundCollab = await Collab.findOne({ student_id: collabID, item_id: itemID });
+        console.log('foundCollab: \n',foundCollab);
+        if(foundCollab.role === 'leader'){
+            console.log("Collaborator is leader so no delete");
+            res.redirect("/admin/projects/" + itemID);
+            return;
+        }
+    } catch (err) {
+        console.log("Error finding collabs for deleting collaboration.", err);
+    }
+
+    try {
+        const foundCollabs = await Collab.find({ item_id: itemID });
+        // console.log('Number of collaborators: ', foundCollabs.length);
+        if (foundCollabs.length <= 1) {
+            console.log("Only one collaborator so no delete");
+            res.redirect("/admin/projects/" + itemID);
+            return;
+        }
+    } catch (err) {
+        console.log("Error number of finding collabs for deleting collaboration.", err);
+    }
+
+    try {
+        await Collab.deleteOne({ student_id: collabID, item_id: itemID });
+        console.log("Collaboration Deleted.");
+    } catch (err) {
+        console.log("Error deleting collaboration.", err);
+    }
 
     res.redirect("/admin/projects/" + itemID);
 });

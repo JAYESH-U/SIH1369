@@ -6,10 +6,15 @@ const collabSchema = new mongoose.Schema({
         ref: "user",
         required: true
     },
-    item_id: { 
+    item_id: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "item",
-        required: true }
+        required: true
+    },
+    role: {
+        type: String,
+        required: true
+    },
 });
 
 module.exports = mongoose.model("collab", collabSchema);

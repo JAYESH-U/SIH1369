@@ -83,7 +83,7 @@
 
             <div class="d-flex justify-content-between py-3 border-bottom">
                 <!-- <a href="javascript:window.history.back()" class="btn btn-sm  mr-5 px-5 btn-outline-secondary">Back</a> -->
-                <a href="/admin" class="btn btn-sm  mr-5 px-5 btn-outline-secondary">Back</a>
+                <a href="/admin" class="btn btn  mr-5 px-5 btn-outline-secondary">Back</a>
                 <button class="btn btn-secondary" id="<%= item._id %>" type="submit" name="item_id" value="<%= item._id %>">
                     Edit Project
                 </button>
@@ -97,13 +97,15 @@
                 <form class="needs-validation" action="/deletecollaborator" method="post" novalidate>
                     <input type="text" id="<%= item._id %>" style="display: none;" name="item_id" value="<%= item._id %>">
                     <% members.forEach(function(member){ %> %>
-                        <div class="container border rounded d-flex flex-column align-items-center py-2 px-5 mt-2">
+                        <div class="container border rounded d-flex flex-column align-items-center mt-2">
                             <div class="d-flex justify-content-between py-3">
-                                <div class="container d-flex align-items-center flex-column">
+                                <div class="container d-flex align-items-start flex-column mx-3">
                                     <p class="m-0">Name : <%= member.name %></p>
                                     <p class="m-0">USN : <%= member.usn %></p>
+                                    <p class="m-0">Role : <%= member.role %></p>
                                 </div>
-                                <div class="d-flex justify-content-end">
+                                <div class="border m-0"></div>
+                                <div class="d-flex justify-content-end mx-3 my-2">
                                     <button class="btn btn-secondary" id="<%= member._id %>" type="submit" name="collab_id" value="<%= member._id %>">
                                         DeleteCollab
                                     </button>

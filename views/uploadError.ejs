@@ -1,0 +1,49 @@
+<%- include("partials/header") -%>
+    <%- include("navbar") -%>
+
+    <div class="container d-flex justify-content-center align-items-center flex-column">
+        <h1 class="text-danger">
+            <%= message %>
+        </h1>
+    </div>
+
+    <div class="album my-3 py-5">
+        <div class="container">
+            <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-3">
+    
+                <!-- <%- include("items") -%> -->
+                <% console.log(itemList) %>
+    
+                <% if(itemList.length != 0){ %>
+                    <% itemList.forEach(function(item){ %>
+                        <div class="col">
+                            <div class="card shadow-sm">
+                                    <img class="bd-placeholder-img card-img-top" width="100%" height="225" src="/img/<%= item.image.data %>" role="img" alt="<%= item.image.data %>">
+                                <div class="card-body">
+                                    <p class="card-text"><%= item.name %></p>
+                                    <p class="card-text description-overflow"><%= item.description %></p>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div class="btn-group">
+                                            <a href="/projects/<%= item._id %>" class="btn btn-sm btn-outline-secondary">Details</a>
+                                        </div>
+                                        <small class="text-body-secondary">College : <span class="fw-bold"> <%= item.college %> </span></small>
+                                        <small class="text-body-secondary">Date: <span class="fw-bold"> <%= new Date(item.createdAt).toLocaleDateString() %> </span></small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <% }); %>
+                <% }else{ %>
+                    <h1>No Items available </h1>
+                <% } %>
+    
+            </div>
+        </div>
+    </div>
+
+    <div class="container d-flex justify-content-around">
+        <a href="javascript:window.history.back()" class="btn px-5 my-5 btn-outline-secondary">Back</a>
+        <a href="/admin" class="btn bg-secondary px-5 my-5">Ok</a>
+    </div>
+
+<%- include("partials/footer") -%>
