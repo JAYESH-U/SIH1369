@@ -626,6 +626,7 @@ app.get("/admin/projects/:projectid", async function (req, res) {
     const reqTitle = req.params.projectid;
     // const message = req.query.message;
     let collabMembers = [];
+    const message = req.query.message;
 
     try {
         // Find the project by ID, populate the members
@@ -657,7 +658,7 @@ app.get("/admin/projects/:projectid", async function (req, res) {
 
             if (collabMembers.length > 0) {
                 console.log("collab members is ready");
-                res.render("ediproject", { title: "collab members not found.", message: "", item: foundItem, members: collabMembers });
+                res.render("ediproject", { title: "collab members not found.", message: message, item: foundItem, members: collabMembers });
             } else {
                 console.log("No collab members found for the given project and collaborations.");
                 return res.redirect('/admin');
@@ -679,20 +680,23 @@ app.post("/addcollaborator", async function (req, res) {
     const collabusn = req.body.collabusn;
     const role = 'member';
 
+    let message = '';
     try {
         const foundItem = await Item.findOne({ _id: itemId });
         if (!foundItem) {
-            console.log("Item not found for addcollab.");
+            message = "Item not found for addcollab.";
         } else {
-            console.log("item found for addcollab.");
+            message =collabusn + " added to collab. If its not updated on the page, please reload once";
             console.log(foundItem, collabusn);
             addCollab(foundItem, collabusn, role);
         }
     } catch (err) {
-        console.log("Error finding item to add collab.", err);
+        message = "Error finding item to add collab." + err;
     }
 
-    res.redirect('/admin/projects/' + itemId);
+    console.log(message);
+
+    res.redirect('/admin/projects/' + itemId + `?message=${encodeURIComponent(message)}`);
 });
 
 app.post('/deletecollaborator', async function (req, res) {
@@ -701,12 +705,14 @@ app.post('/deletecollaborator', async function (req, res) {
 
     console.log(collabID, itemID);
 
+    let message = '';
+
     try {
         const foundCollab = await Collab.findOne({ student_id: collabID, item_id: itemID });
-        console.log('foundCollab: \n',foundCollab);
-        if(foundCollab.role === 'leader'){
-            console.log("Collaborator is leader so no delete");
-            res.redirect("/admin/projects/" + itemID);
+        console.log('foundCollab: \n', foundCollab);
+        if (foundCollab.role === 'leader') {
+            message = "Collaborator is leader so no delete";
+            res.redirect("/admin/projects/" + itemID + `?message=${encodeURIComponent(message)}`);
             return;
         }
     } catch (err) {
@@ -717,8 +723,8 @@ app.post('/deletecollaborator', async function (req, res) {
         const foundCollabs = await Collab.find({ item_id: itemID });
         // console.log('Number of collaborators: ', foundCollabs.length);
         if (foundCollabs.length <= 1) {
-            console.log("Only one collaborator so no delete");
-            res.redirect("/admin/projects/" + itemID);
+            message = "Only one collaborator so no delete";
+            res.redirect("/admin/projects/" + itemID + `?message=${encodeURIComponent(message)}`);
             return;
         }
     } catch (err) {
@@ -727,12 +733,13 @@ app.post('/deletecollaborator', async function (req, res) {
 
     try {
         await Collab.deleteOne({ student_id: collabID, item_id: itemID });
-        console.log("Collaboration Deleted.");
+        message = "Collaboration Deleted.";
     } catch (err) {
-        console.log("Error deleting collaboration.", err);
+        message = "Error deleting collaboration." + err;
     }
-
-    res.redirect("/admin/projects/" + itemID);
+    console.log(message);
+    
+    res.redirect("/admin/projects/" + itemID + `?message=${encodeURIComponent(message)}`);
 });
 
 app.post("/editproject", upload, function (req, res) {
@@ -742,6 +749,8 @@ app.post("/editproject", upload, function (req, res) {
     const subject = req.body.subject;
     const college = req.body.college;
     let link = req.body.link;
+
+    let message = '';
 
     const imgFile = req.files.imgfile;
 
@@ -785,16 +794,19 @@ app.post("/editproject", upload, function (req, res) {
                             console.log("Updated Item with image:", updatedItem);
 
                             if (updatedItem) {
-                                console.log("Item edited with image successfully.");
-                                res.redirect("/admin/projects/" + itemID);
+                                message = "Item edited with image successfully.";
+                                console.log(message);
+                                res.redirect("/admin/projects/" + itemID + `?message=${encodeURIComponent(message)}`);
                             } else {
-                                console.log("No item found or no changes made with img.");
-                                res.redirect("/admin/projects/" + itemID);
+                                message = "No item found or no changes made with img.";
+                                console.log(message);
+                                res.redirect("/admin/projects/" + itemID + `?message=${encodeURIComponent(message)}`);
                             }
                         })
                         .catch((error) => {
-                            console.log("Error while editing Item with image:", error);
-                            res.redirect("/admin/projects/" + itemID);
+                            message = "Error while editing Item with image:" + error;
+                            console.log(message);
+                            res.redirect("/admin/projects/" + itemID + `?message=${encodeURIComponent(message)}`);
                         });
                 }
             })
@@ -820,16 +832,19 @@ app.post("/editproject", upload, function (req, res) {
                             console.log("Updated Item with image:", updatedItem);
 
                             if (updatedItem) {
-                                console.log("Item edited with image successfully.");
-                                res.redirect("/admin/projects/" + itemID);
+                                message = "Item edited without image successfully.";
+                                console.log(message);
+                                res.redirect("/admin/projects/" + itemID + `?message=${encodeURIComponent(message)}`);
                             } else {
-                                console.log("No item found or no changes made with img.");
-                                res.redirect("/admin/projects/" + itemID);
+                                message = "No item found or no changes made with img.";
+                                console.log(message);
+                                res.redirect("/admin/projects/" + itemID + `?message=${encodeURIComponent(message)}`);
                             }
                         })
                         .catch((error) => {
-                            console.log("Error while editing Item with image:", error);
-                            res.redirect("/admin/projects/" + itemID);
+                            message = "Error while editing Item with image:" + error;
+                            console.log(message);
+                            res.redirect("/admin/projects/" + itemID + `?message=${encodeURIComponent(message)}`);
                         });
                 }
             })
